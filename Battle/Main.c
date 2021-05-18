@@ -80,6 +80,8 @@ D3D12_VERTEX_BUFFER_VIEW gDescViewBufVert;
 ID3D12Fence* gFence;
 static UINT64 gCurrentFence;
 HANDLE gFenceEvent;
+ID3D12DescriptorHeap* gCbvHeap;
+UINT gCbvDescriptorSize;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -154,6 +156,45 @@ void WaitForPreviousFrame()
 	}
 
 	gFrameIndex = gSwapChain->lpVtbl->GetCurrentBackBufferIndex(gSwapChain);
+}
+
+ID3D12Resource* CreateCommittedResource(int size)
+{
+	D3D12_HEAP_PROPERTIES heapProperties =
+	{
+		D3D12_HEAP_TYPE_UPLOAD,
+		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+		D3D12_MEMORY_POOL_UNKNOWN,
+		1,
+		1
+	};
+
+	D3D12_RESOURCE_DESC VertexBufferDesc =
+	{
+		D3D12_RESOURCE_DIMENSION_BUFFER,
+		0,
+		size,
+		1,
+		1,
+		1,
+		DXGI_FORMAT_UNKNOWN,
+		{1, 0},
+		D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+		D3D12_RESOURCE_FLAG_NONE
+	};
+
+	ID3D12Resource* pRes;
+
+	ThrowIfFailed(gDevice->lpVtbl->CreateCommittedResource(gDevice,
+		&heapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&VertexBufferDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		NULL, // Clear value
+		&IID_ID3D12Resource,
+		(LPVOID*)&pRes));
+
+	return pRes;
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine,
@@ -246,6 +287,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		}
 	}
 
+	{
+		D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {0,};
+		cbvHeapDesc.NumDescriptors = 1;
+		cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		ThrowIfFailed(
+			gDevice->lpVtbl->CreateDescriptorHeap(gDevice, &cbvHeapDesc, &IID_ID3D12DescriptorHeap,
+			                                      (LPVOID*)&gCbvHeap));
+
+		gCbvDescriptorSize = gDevice->lpVtbl->GetDescriptorHandleIncrementSize(gDevice,
+		                                                                       D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		
+	}
+
+
 	gDevice->lpVtbl->CreateCommandAllocator(gDevice, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator,
 	                                        (LPVOID*)&gCommandAllocator);
 
@@ -269,7 +326,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	// Enable better shader debugging with the graphics debugging tools.
 	UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #else
-	UINT compileFlags = 0;
+    UINT compileFlags = 0;
 #endif
 	ID3DBlob* vertexShader;
 	ID3DBlob* pixelShader;
@@ -352,37 +409,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{{-1.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}
 	};
 
-	static D3D12_HEAP_PROPERTIES heapProperties =
-	{
-		D3D12_HEAP_TYPE_UPLOAD,
-		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-		D3D12_MEMORY_POOL_UNKNOWN,
-		1,
-		1
-	};
-
-	static D3D12_RESOURCE_DESC VertexBufferDesc =
-	{
-		D3D12_RESOURCE_DIMENSION_BUFFER,
-		0,
-		_countof(triangleVerts) * sizeof(Vertex),
-		1,
-		1,
-		1,
-		DXGI_FORMAT_UNKNOWN,
-		{1, 0},
-		D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-		D3D12_RESOURCE_FLAG_NONE
-	};
-
-	ThrowIfFailed(gDevice->lpVtbl->CreateCommittedResource(gDevice,
-	                                                       &heapProperties,
-	                                                       D3D12_HEAP_FLAG_NONE,
-	                                                       &VertexBufferDesc,
-	                                                       D3D12_RESOURCE_STATE_GENERIC_READ,
-	                                                       NULL, // Clear value
-	                                                       &IID_ID3D12Resource,
-	                                                       (LPVOID*)&gBufVerts));
+	gBufVerts = CreateCommittedResource(_countof(triangleVerts) * sizeof(Vertex));
 
 	UINT8* dataBegin;
 	gBufVerts->lpVtbl->Map(gBufVerts, 0, NULL, (void**)(&dataBegin));
@@ -423,10 +450,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
 			D3D12_RESOURCE_BARRIER_FLAG_NONE,
 			{
-				gRenderTargets[gFrameIndex],
-				D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-				D3D12_RESOURCE_STATE_PRESENT,
-				D3D12_RESOURCE_STATE_RENDER_TARGET
+				{
+					gRenderTargets[gFrameIndex],
+					D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+					D3D12_RESOURCE_STATE_PRESENT,
+					D3D12_RESOURCE_STATE_RENDER_TARGET
+				}
 			}
 		};
 
@@ -436,10 +465,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		((void(__stdcall*)(ID3D12DescriptorHeap*, D3D12_CPU_DESCRIPTOR_HANDLE*))
 			gRtvHeap->lpVtbl->GetCPUDescriptorHandleForHeapStart)(gRtvHeap, &rtvHandle);
 
-		rtvHandle.ptr += gFrameIndex * gRtvDescriptorSize;
+		rtvHandle.ptr += (SIZE_T)gRtvDescriptorSize * gFrameIndex;
 
 		// Record commands.
-		float clearColor[] = {0.0f, 0.2f, 0.4f, 1.0f};
+		float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
 		gCommandList->lpVtbl->ClearRenderTargetView(gCommandList, rtvHandle, clearColor, 0, NULL);
 
 		gCommandList->lpVtbl->OMSetRenderTargets(gCommandList, 1, &rtvHandle, TRUE, NULL);
@@ -452,10 +481,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
 			D3D12_RESOURCE_BARRIER_FLAG_NONE,
 			{
-				gRenderTargets[gFrameIndex],
-				D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-				D3D12_RESOURCE_STATE_RENDER_TARGET,
-				D3D12_RESOURCE_STATE_PRESENT
+				{
+					gRenderTargets[gFrameIndex],
+					D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+					D3D12_RESOURCE_STATE_RENDER_TARGET,
+					D3D12_RESOURCE_STATE_PRESENT
+				}
 			}
 		};
 
@@ -463,7 +494,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 		ThrowIfFailed(gCommandList->lpVtbl->Close(gCommandList));
 
-		ID3D12CommandList* ppCommandLists[] = { (ID3D12CommandList*)gCommandList };
+		ID3D12CommandList* ppCommandLists[] = {(ID3D12CommandList*)gCommandList};
 		gCommandQueue->lpVtbl->ExecuteCommandLists(gCommandQueue, _countof(ppCommandLists), ppCommandLists);
 
 		ThrowIfFailed(gSwapChain->lpVtbl->Present(gSwapChain, 1, 0));
@@ -492,5 +523,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	ReleaseCom(gPipelineState);
 	ReleaseCom(gBufVerts);
 	ReleaseCom(gFence);
+	ReleaseCom(gCbvHeap);
 	return (int)msg.wParam;
 }
