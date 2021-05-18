@@ -9,6 +9,11 @@
 //
 //*********************************************************
 
+cbuffer cbPerObject : register(b0)
+{
+    float4x4 gWorldViewProj;
+};
+
 struct PSInput
 {
     float4 position : SV_POSITION;
@@ -19,7 +24,7 @@ PSInput VSMain(float4 position : POSITION, float4 color : COLOR)
 {
     PSInput result;
 
-    result.position = position;
+    result.position = mul(position, gWorldViewProj);
     result.color = color;
 
     return result;

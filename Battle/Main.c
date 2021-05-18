@@ -6,6 +6,8 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <D3Dcompiler.h>
+#include <math.h>
+#include <time.h>
 
 #pragma region GUID
 #define DEFINE_GUIDW(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8) const GUID DECLSPEC_SELECTANY name = { l, w1, w2, { b1, b2, b3, b4, b5, b6, b7, b8 } }
@@ -82,6 +84,9 @@ static UINT64 gCurrentFence;
 HANDLE gFenceEvent;
 ID3D12DescriptorHeap* gCbvHeap;
 UINT gCbvDescriptorSize;
+ID3D12Resource* gUploadCBuffer;
+LARGE_INTEGER gCurTime;
+LARGE_INTEGER gCountsPerSec;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -186,15 +191,29 @@ ID3D12Resource* CreateCommittedResource(int size)
 	ID3D12Resource* pRes;
 
 	ThrowIfFailed(gDevice->lpVtbl->CreateCommittedResource(gDevice,
-		&heapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&VertexBufferDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		NULL, // Clear value
-		&IID_ID3D12Resource,
-		(LPVOID*)&pRes));
+	                                                       &heapProperties,
+	                                                       D3D12_HEAP_FLAG_NONE,
+	                                                       &VertexBufferDesc,
+	                                                       D3D12_RESOURCE_STATE_GENERIC_READ,
+	                                                       NULL, // Clear value
+	                                                       &IID_ID3D12Resource,
+	                                                       (LPVOID*)&pRes));
 
 	return pRes;
+}
+
+void UpdateScale(float scale)
+{
+	UINT8* dataBegin;
+	gUploadCBuffer->lpVtbl->Map(gUploadCBuffer, 0, NULL, (void**)&dataBegin);
+	float mvpMat[] = {
+		scale, 0.0f, 0.0f, 0.0f,
+		0.0f, scale, 0.0f, 0.0f,
+		0.0f, 0.0f, scale, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f,
+	};
+	memcpy(dataBegin, mvpMat, sizeof(mvpMat));
+	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine,
@@ -291,7 +310,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {0,};
 		cbvHeapDesc.NumDescriptors = 1;
 		cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		ThrowIfFailed(
 			gDevice->lpVtbl->CreateDescriptorHeap(gDevice, &cbvHeapDesc, &IID_ID3D12DescriptorHeap,
 			                                      (LPVOID*)&gCbvHeap));
@@ -299,7 +318,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		gCbvDescriptorSize = gDevice->lpVtbl->GetDescriptorHandleIncrementSize(gDevice,
 		                                                                       D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-		
+		const int uploadBufferSize = 256;
+		gUploadCBuffer = CreateCommittedResource(uploadBufferSize);
+
+		UpdateScale(0.1f);
+
+		D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
+		((void(__stdcall*)(ID3D12DescriptorHeap*, D3D12_CPU_DESCRIPTOR_HANDLE*))
+			gCbvHeap->lpVtbl->GetCPUDescriptorHandleForHeapStart)(gCbvHeap, &cbvHandle);
+
+		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+		cbvDesc.BufferLocation = gUploadCBuffer->lpVtbl->GetGPUVirtualAddress(gUploadCBuffer);
+		cbvDesc.SizeInBytes = uploadBufferSize;
+		gDevice->lpVtbl->CreateConstantBufferView(gDevice, &cbvDesc, cbvHandle);
 	}
 
 
@@ -310,9 +341,28 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	{
 		ID3DBlob* pOutBlob;
 		ID3DBlob* pErrorBlob;
+
+		D3D12_DESCRIPTOR_RANGE cbvTableElement = {0,};
+		cbvTableElement.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+		cbvTableElement.NumDescriptors = 1;
+		cbvTableElement.BaseShaderRegister = 0;
+
+		D3D12_ROOT_DESCRIPTOR_TABLE rootDescriptorTable;
+		rootDescriptorTable.NumDescriptorRanges = 1;
+		rootDescriptorTable.pDescriptorRanges = &cbvTableElement;
+
+		D3D12_ROOT_PARAMETER slotRootParameter[1];
+		slotRootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		slotRootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		slotRootParameter[0].DescriptorTable = rootDescriptorTable;
+		
 		D3D12_ROOT_SIGNATURE_DESC descRootSignature =
 		{
-			0, NULL, 0, NULL, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+			1,
+			slotRootParameter,
+			0,
+			NULL,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
 		};
 		ThrowIfFailed(D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &pOutBlob,
 		                                          &pErrorBlob));
@@ -427,6 +477,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 	gFenceEvent = CreateEventEx(NULL, FALSE, FALSE, EVENT_ALL_ACCESS);
 
+	QueryPerformanceFrequency(&gCountsPerSec);
+
+	double secondsPerCount = 1.0 / (double)(*(__int64*)&gCountsPerSec);
+
 	static BOOL bRunning = TRUE;
 	static MSG msg;
 	while (bRunning)
@@ -441,6 +495,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		ThrowIfFailed(gCommandList->lpVtbl->Reset(gCommandList, gCommandAllocator, gPipelineState));
 
 		gCommandList->lpVtbl->SetGraphicsRootSignature(gCommandList, gRootSignature);
+		ID3D12DescriptorHeap* descriptorHeaps[] = { gCbvHeap };
+		gCommandList->lpVtbl->SetDescriptorHeaps(gCommandList, 1, descriptorHeaps);
+
+		D3D12_GPU_DESCRIPTOR_HANDLE cbvHandle;
+		((void(__stdcall*)(ID3D12DescriptorHeap*, D3D12_GPU_DESCRIPTOR_HANDLE*))
+			gCbvHeap->lpVtbl->GetGPUDescriptorHandleForHeapStart)(gCbvHeap, &cbvHandle);
+
+		gCommandList->lpVtbl->SetGraphicsRootDescriptorTable(gCommandList, 0, cbvHandle);
+		
 		gCommandList->lpVtbl->RSSetViewports(gCommandList, 1, &mViewport);
 		gCommandList->lpVtbl->RSSetScissorRects(gCommandList, 1, &mRectScissor);
 
@@ -500,6 +563,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		ThrowIfFailed(gSwapChain->lpVtbl->Present(gSwapChain, 1, 0));
 
 		WaitForPreviousFrame();
+
+		QueryPerformanceCounter(&gCurTime);
+
+		double sec = secondsPerCount * (*(__int64*)&gCurTime);
+		
+		UpdateScale(sinf(sec));
 	}
 
 	WaitForPreviousFrame();
@@ -524,5 +593,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	ReleaseCom(gBufVerts);
 	ReleaseCom(gFence);
 	ReleaseCom(gCbvHeap);
+	ReleaseCom(gUploadCBuffer);
 	return (int)msg.wParam;
 }
