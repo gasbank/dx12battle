@@ -85,8 +85,8 @@ HANDLE gFenceEvent;
 ID3D12DescriptorHeap* gCbvHeap;
 UINT gCbvDescriptorSize;
 ID3D12Resource* gUploadCBuffer;
-LARGE_INTEGER gCurTime;
-LARGE_INTEGER gCountsPerSec;
+__int64 gCurTime;
+__int64 gCountsPerSec;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -202,7 +202,7 @@ ID3D12Resource* CreateCommittedResource(int size)
 	return pRes;
 }
 
-void UpdateScale(float scale)
+void UpdateScale(float scale, float c0, float c1, float c2, float c3)
 {
 	UINT8* dataBegin;
 	gUploadCBuffer->lpVtbl->Map(gUploadCBuffer, 0, NULL, (void**)&dataBegin);
@@ -211,6 +211,7 @@ void UpdateScale(float scale)
 		0.0f, scale, 0.0f, 0.0f,
 		0.0f, 0.0f, scale, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f,
+		c0, c1, c2, c3
 	};
 	memcpy(dataBegin, mvpMat, sizeof(mvpMat));
 	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
@@ -321,7 +322,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		const int uploadBufferSize = 256;
 		gUploadCBuffer = CreateCommittedResource(uploadBufferSize);
 
-		UpdateScale(0.1f);
+		UpdateScale(0.1f, 1, 1, 1, 1);
 
 		D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
 		((void(__stdcall*)(ID3D12DescriptorHeap*, D3D12_CPU_DESCRIPTOR_HANDLE*))
@@ -477,9 +478,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 	gFenceEvent = CreateEventEx(NULL, FALSE, FALSE, EVENT_ALL_ACCESS);
 
-	QueryPerformanceFrequency(&gCountsPerSec);
+	QueryPerformanceFrequency((LARGE_INTEGER*)&gCountsPerSec);
 
-	double secondsPerCount = 1.0 / (double)(*(__int64*)&gCountsPerSec);
+	double secondsPerCount = 1.0 / (double)gCountsPerSec;
 
 	static BOOL bRunning = TRUE;
 	static MSG msg;
@@ -564,11 +565,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 		WaitForPreviousFrame();
 
-		QueryPerformanceCounter(&gCurTime);
+		QueryPerformanceCounter((LARGE_INTEGER*)&gCurTime);
 
-		double sec = secondsPerCount * (*(__int64*)&gCurTime);
+		double sec = secondsPerCount * gCurTime;
 		
-		UpdateScale(sinf(sec));
+		UpdateScale(sinf((float)sec), 0, 1, 1, 1);
 	}
 
 	WaitForPreviousFrame();
