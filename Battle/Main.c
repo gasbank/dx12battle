@@ -8,49 +8,10 @@
 #include <D3Dcompiler.h>
 #include <math.h>
 #include <time.h>
+#include "Vertex.h"
+#include "PredefinedGuid.h"
 
-#pragma region GUID
-#define DEFINE_GUIDW(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8) const GUID DECLSPEC_SELECTANY name = { l, w1, w2, { b1, b2, b3, b4, b5, b6, b7, b8 } }
-
-DEFINE_GUIDW(IID_ID3D12Object, 0xc4fec28f, 0x7966, 0x4e95, 0x9f, 0x94, 0xf4, 0x31, 0xcb, 0x56, 0xc3, 0xb8);
-DEFINE_GUIDW(IID_ID3D12DeviceChild, 0x905db94b, 0xa00c, 0x4140, 0x9d, 0xf5, 0x2b, 0x64, 0xca, 0x9e, 0xa3, 0x57);
-DEFINE_GUIDW(IID_ID3D12RootSignature, 0xc54a6b66, 0x72df, 0x4ee8, 0x8b, 0xe5, 0xa9, 0x46, 0xa1, 0x42, 0x92, 0x14);
-DEFINE_GUIDW(IID_ID3D12RootSignatureDeserializer, 0x34AB647B, 0x3CC8, 0x46AC, 0x84, 0x1B, 0xC0, 0x96, 0x56, 0x45, 0xC0,
-             0x46);
-DEFINE_GUIDW(IID_ID3D12Pageable, 0x63ee58fb, 0x1268, 0x4835, 0x86, 0xda, 0xf0, 0x08, 0xce, 0x62, 0xf0, 0xd6);
-DEFINE_GUIDW(IID_ID3D12Heap, 0x6b3b2502, 0x6e51, 0x45b3, 0x90, 0xee, 0x98, 0x84, 0x26, 0x5e, 0x8d, 0xf3);
-DEFINE_GUIDW(IID_ID3D12Resource, 0x696442be, 0xa72e, 0x4059, 0xbc, 0x79, 0x5b, 0x5c, 0x98, 0x04, 0x0f, 0xad);
-DEFINE_GUIDW(IID_ID3D12CommandAllocator, 0x6102dee4, 0xaf59, 0x4b09, 0xb9, 0x99, 0xb4, 0x4d, 0x73, 0xf0, 0x9b, 0x24);
-DEFINE_GUIDW(IID_ID3D12Fence, 0x0a753dcf, 0xc4d8, 0x4b91, 0xad, 0xf6, 0xbe, 0x5a, 0x60, 0xd9, 0x5a, 0x76);
-DEFINE_GUIDW(IID_ID3D12PipelineState, 0x765a30f3, 0xf624, 0x4c6f, 0xa8, 0x28, 0xac, 0xe9, 0x48, 0x62, 0x24, 0x45);
-DEFINE_GUIDW(IID_ID3D12DescriptorHeap, 0x8efb471d, 0x616c, 0x4f49, 0x90, 0xf7, 0x12, 0x7b, 0xb7, 0x63, 0xfa, 0x51);
-DEFINE_GUIDW(IID_ID3D12QueryHeap, 0x0d9658ae, 0xed45, 0x469e, 0xa6, 0x1d, 0x97, 0x0e, 0xc5, 0x83, 0xca, 0xb4);
-DEFINE_GUIDW(IID_ID3D12CommandSignature, 0xc36a797c, 0xec80, 0x4f0a, 0x89, 0x85, 0xa7, 0xb2, 0x47, 0x50, 0x82, 0xd1);
-DEFINE_GUIDW(IID_ID3D12CommandList, 0x7116d91c, 0xe7e4, 0x47ce, 0xb8, 0xc6, 0xec, 0x81, 0x68, 0xf4, 0x37, 0xe5);
-DEFINE_GUIDW(IID_ID3D12GraphicsCommandList, 0x5b160d0f, 0xac1b, 0x4185, 0x8b, 0xa8, 0xb3, 0xae, 0x42, 0xa5, 0xa4, 0x55);
-DEFINE_GUIDW(IID_ID3D12CommandQueue, 0x0ec870a6, 0x5d7e, 0x4c22, 0x8c, 0xfc, 0x5b, 0xaa, 0xe0, 0x76, 0x16, 0xed);
-DEFINE_GUIDW(IID_ID3D12Device, 0x189819f1, 0x1db6, 0x4b57, 0xbe, 0x54, 0x18, 0x21, 0x33, 0x9b, 0x85, 0xf7);
-
-#ifdef _DEBUG
-// d3d12sdklayers.h
-DEFINE_GUIDW(DXGI_DEBUG_D3D12, 0xcf59a98c, 0xa950, 0x4326, 0x91, 0xef, 0x9b, 0xba, 0xa1, 0x7b, 0xfd, 0x95);
-
-DEFINE_GUIDW(IID_ID3D12Debug, 0x344488b7, 0x6846, 0x474b, 0xb9, 0x89, 0xf0, 0x27, 0x44, 0x82, 0x45, 0xe0);
-DEFINE_GUIDW(IID_ID3D12DebugDevice, 0x3febd6dd, 0x4973, 0x4787, 0x81, 0x94, 0xe4, 0x5f, 0x9e, 0x28, 0x92, 0x3e);
-DEFINE_GUIDW(IID_ID3D12DebugCommandQueue, 0x09e0bf36, 0x54ac, 0x484f, 0x88, 0x47, 0x4b, 0xae, 0xea, 0xb6, 0x05, 0x3a);
-DEFINE_GUIDW(IID_ID3D12DebugCommandList, 0x09e0bf36, 0x54ac, 0x484f, 0x88, 0x47, 0x4b, 0xae, 0xea, 0xb6, 0x05, 0x3f);
-DEFINE_GUIDW(IID_ID3D12InfoQueue, 0x0742a90b, 0xc387, 0x483f, 0xb9, 0x46, 0x30, 0xa7, 0xe4, 0xe6, 0x14, 0x58);
-#endif
-
-// dxgi1_4.h
-DEFINE_GUIDW(IID_IDXGISwapChain3, 0x94d99bdb, 0xf1f8, 0x4ab0, 0xb2, 0x36, 0x7d, 0xa0, 0x17, 0x0e, 0xda, 0xb1);
-DEFINE_GUIDW(IID_IDXGIOutput4, 0xdc7dca35, 0x2196, 0x414d, 0x9F, 0x53, 0x61, 0x78, 0x84, 0x03, 0x2a, 0x60);
-DEFINE_GUIDW(IID_IDXGIFactory4, 0x1bc6ea02, 0xef36, 0x464f, 0xbf, 0x0c, 0x21, 0xca, 0x39, 0xe5, 0x16, 0x8a);
-DEFINE_GUIDW(IID_IDXGIAdapter3, 0x645967A4, 0x1392, 0x4310, 0xA7, 0x98, 0x80, 0x53, 0xCE, 0x3E, 0x93, 0xFD);
-
-#pragma endregion
-
-#define WIN_WIDTH 800``
+#define WIN_WIDTH 800
 #define WIN_HEIGHT 600
 #define WIN_POS_X 200
 #define WIN_POS_Y 200
@@ -87,6 +48,13 @@ UINT gCbvDescriptorSize;
 ID3D12Resource* gUploadCBuffer;
 __int64 gCurTime;
 __int64 gCountsPerSec;
+
+typedef struct _CBPEROBJECT
+{
+	float gWorldViewProj[16]; // 64-byte
+	float c[48][4]; // 768-byte
+	float pad0[4 * 4 * 3]; // 192-byte
+} CBPEROBJECT;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -202,31 +170,58 @@ ID3D12Resource* CreateCommittedResource(size_t size)
 	return pRes;
 }
 
-void UpdateScale(float scale, float c0, float c1, float c2, float c3)
+void InitConstantBuffer()
 {
 	UINT8* dataBegin;
 	gUploadCBuffer->lpVtbl->Map(gUploadCBuffer, 0, NULL, (void**)&dataBegin);
+	CBPEROBJECT cbPerObject;
+	float mvpMat[] = {
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f,
+	};
+	memcpy(cbPerObject.gWorldViewProj, mvpMat, sizeof(mvpMat));
+	memset(cbPerObject.c, 0, sizeof(cbPerObject.c));
+	
+	memcpy(dataBegin, &cbPerObject, sizeof(cbPerObject));
+	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
+}
+
+void UpdateScale(float scale, double sec)
+{
+	UINT8* dataBegin;
+	gUploadCBuffer->lpVtbl->Map(gUploadCBuffer, 0, NULL, (void**)&dataBegin);
+	CBPEROBJECT cbPerObject;
 	float mvpMat[] = {
 		scale, 0.0f, 0.0f, 0.0f,
 		0.0f, scale, 0.0f, 0.0f,
 		0.0f, 0.0f, scale, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f,
-		c0, c1, c2, c3
 	};
-	memcpy(dataBegin, mvpMat, sizeof(mvpMat));
+	memcpy(cbPerObject.gWorldViewProj, mvpMat, sizeof(mvpMat));
+
+	memset(cbPerObject.c, 0, sizeof(cbPerObject.c));
+
+	for (int i = 0; i < _countof(cbPerObject.c); i++)
+	{
+		float s = sinf(((float)sec + i) * 2);
+		float d = 10.0f;
+		for (int j = 0; j < 4; j++)
+		{	
+			cbPerObject.c[i][j] = s / 255.0f * d;
+		}
+	}
+	
+	memcpy(dataBegin, &cbPerObject, sizeof(cbPerObject));
 	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
 }
 
-typedef struct
-{
-	float position[3];
-	float color[4];
-} Vertex;
-
-void SetVertexData(Vertex* pV, float x, float y, float z, float cr, float cg, float cb, float ca)
+void SetVertexData(Vertex* pV, float x, float y, float z, float cr, float cg, float cb, float ca, UINT rindex)
 {
 	pV->position[0] = x; pV->position[1] = y; pV->position[2] = z;
 	pV->color[0] = cr; pV->color[1] = cg; pV->color[2] = cb; pV->color[3] = ca;
+	pV->rindex[0] = pV->rindex[1] = pV->rindex[2] = pV->rindex[3] = rindex;
 }
 
 Vertex* AllocRectangularGrid(int xCount, int yCount, UINT* s)
@@ -242,6 +237,7 @@ Vertex* AllocRectangularGrid(int xCount, int yCount, UINT* s)
 	float dx = 2.0f / xCount;
 	float dy = 2.0f / yCount;
 	Vertex* pV = v;
+	UINT rIndex = 0;
 	for (int x = 0; x < xCount; x++)
 	{
 		for (int y = 0; y < yCount; y++)
@@ -249,37 +245,62 @@ Vertex* AllocRectangularGrid(int xCount, int yCount, UINT* s)
 			float xc = (-1.0f + dx / 2 + dx * x);
 			float yc = (+1.0f - dy / 2 - dy * y);
 
+			int dev = 50;
+
+			float r0 = (33 + (rand() % dev - dev / 2)) / 255.0f;
+			float g0 = (27 + (rand() % dev - dev / 2)) / 255.0f;
+			float b0 = (102 + (rand() % dev - dev / 2)) / 255.0f;
+
+			float r1 = (78 + (rand() % dev - dev / 2)) / 255.0f;
+			float g1 = (63 + (rand() % dev - dev / 2)) / 255.0f;
+			float b1 = (242 + (rand() % dev - dev / 2)) / 255.0f;
+
+			float r2 = (53 + (rand() % dev - dev / 2)) / 255.0f;
+			float g2 = (43 + (rand() % dev - dev / 2)) / 255.0f;
+			float b2 = (166 + (rand() % dev - dev / 2)) / 255.0f;
+
+			float r3 = (66 + (rand() % dev - dev / 2)) / 255.0f;
+			float g3 = (53 + (rand() % dev - dev / 2)) / 255.0f;
+			float b3 = (204 + (rand() % dev - dev / 2)) / 255.0f;
+
+			float r4 = (75 + (rand() % dev - dev / 2)) / 255.0f;
+			float g4 = (60 + (rand() % dev - dev / 2)) / 255.0f;
+			float b4 = (230 + (rand() % dev - dev / 2)) / 255.0f;
+
+
 			// 동
-			SetVertexData(pV, xc, yc, 0, 1, 0, 0, 1);
+			SetVertexData(pV, xc, yc, 0, r3, g3, b3, 1, rIndex);
 			pV++;
-			SetVertexData(pV, xc + dx / 2, yc + dy / 2, 0, 1, 0, 0, 1);
+			SetVertexData(pV, xc + dx / 2, yc + dy / 2, 0, r1, g1, b1, 1, rIndex);
 			pV++;
-			SetVertexData(pV, xc + dx / 2, yc - dy / 2, 0, 1, 0, 0, 1);
+			SetVertexData(pV, xc + dx / 2, yc - dy / 2, 0, r2, g2, b2, 1, rIndex);
 			pV++;
 
 			// 서
-			SetVertexData(pV, xc, yc, 0, 0, 1, 0, 1);
+			SetVertexData(pV, xc, yc, 0, r3, g3, b3, 1, rIndex);
 			pV++;
-			SetVertexData(pV, xc - dx / 2, yc - dy / 2, 0, 0, 1, 0, 1);
+			SetVertexData(pV, xc - dx / 2, yc - dy / 2, 0, r3, g3, b3, 1, rIndex);
 			pV++;
-			SetVertexData(pV, xc - dx / 2, yc + dy / 2, 0, 0, 1, 0, 1);
+			SetVertexData(pV, xc - dx / 2, yc + dy / 2, 0, r4, g4, b4, 1, rIndex);
 			pV++;
 
 			// 남
-			SetVertexData(pV, xc, yc, 0, 0, 0, 1, 1);
+			SetVertexData(pV, xc, yc, 0, r3, g3, b3, 1, rIndex);
 			pV++;
-			SetVertexData(pV, xc + dx / 2, yc - dy / 2, 0, 0, 0, 1, 1);
+			SetVertexData(pV, xc + dx / 2, yc - dy / 2, 0, r2, g2, b2, 1, rIndex);
 			pV++;
-			SetVertexData(pV, xc - dx / 2, yc - dy / 2, 0, 0, 0, 1, 1);
+			SetVertexData(pV, xc - dx / 2, yc - dy / 2, 0, r3, g3, b3, 1, rIndex);
 			pV++;
 
 			// 북
-			SetVertexData(pV, xc, yc, 0, 1, 1, 1, 1);
+			SetVertexData(pV, xc, yc, 0, r3, g3, b3, 1, rIndex);
 			pV++;
-			SetVertexData(pV, xc - dx / 2, yc + dy / 2, 0, 1, 1, 1, 1);
+			SetVertexData(pV, xc - dx / 2, yc + dy / 2, 0, r4, g4, b4, 1, rIndex);
 			pV++;
-			SetVertexData(pV, xc + dx / 2, yc + dy / 2, 0, 1, 1, 1, 1);
+			SetVertexData(pV, xc + dx / 2, yc + dy / 2, 0, r1, g1, b1, 1, rIndex);
 			pV++;
+
+			rIndex = (rIndex + 1) % 48;
 		}
 	}
 	*s = sizeof(Vertex) * xCount * yCount * 4 * 3;
@@ -293,10 +314,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
 	MyRegisterClass(hInstance);
-	const HWND hWnd = CreateWindow(L"Battle", L"Battle", WS_POPUP | WS_VISIBLE, WIN_POS_X, WIN_POS_Y, WIN_WIDTH,
-	                               WIN_HEIGHT,
-	                               0, 0, hInstance, 0);
-
+	const HWND hWnd = CreateWindow(L"Battle", L"Battle", WS_POPUP | WS_VISIBLE, WIN_POS_X, WIN_POS_Y, WIN_WIDTH, WIN_HEIGHT, 0, 0, hInstance, 0);
+	
 	UINT dxgiFactoryFlags = 0;
 
 #if defined(_DEBUG)
@@ -388,10 +407,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		gCbvDescriptorSize = gDevice->lpVtbl->GetDescriptorHandleIncrementSize(gDevice,
 		                                                                       D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-		const int uploadBufferSize = 256;
+		const int uploadBufferSize = sizeof(CBPEROBJECT);
 		gUploadCBuffer = CreateCommittedResource(uploadBufferSize);
 
-		UpdateScale(0.1f, 1, 1, 1, 1);
+		//UpdateScale(0.1f, 1, 1, 1, 1);
 
 		D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
 		((void(__stdcall*)(ID3D12DescriptorHeap*, D3D12_CPU_DESCRIPTOR_HANDLE*))
@@ -456,7 +475,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	D3D12_INPUT_ELEMENT_DESC layout[] =
 	{
 		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-		{"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
+		{"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+		{"RINDEX", 0, DXGI_FORMAT_R32G32B32A32_UINT, 0, 28, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
 	};
 	UINT numElements = _countof(layout);
 
@@ -529,7 +549,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	//
 
 	UINT vertSize;
-	Vertex* triangleVerts = AllocRectangularGrid(8, 6, &vertSize);
+	Vertex* triangleVerts = AllocRectangularGrid(32, 24, &vertSize);
 
 	gBufVerts = CreateCommittedResource(vertSize);
 
@@ -639,9 +659,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		QueryPerformanceCounter((LARGE_INTEGER*)&gCurTime);
 
 		double sec = secondsPerCount * gCurTime;
+
+		float s = sinf((float)sec);
+		float d = 30.0f;
 		
 		//UpdateScale(sinf((float)sec), 1, 1, 1, 1);
-		UpdateScale(1, 1, 1, 1, 1);
+		UpdateScale(1, sec);
 	}
 
 	WaitForPreviousFrame();
