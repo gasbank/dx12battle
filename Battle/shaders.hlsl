@@ -9,10 +9,13 @@
 //
 //*********************************************************
 
+#define GRID_COUNT_X (8*4)
+#define GRID_COUNT_Y (6*4)
+
 cbuffer cbPerObject : register(b0)
 {
-    float4x4 gWorldViewProj;
-    float4 c[48];
+    float4x4 gWorldViewProj[GRID_COUNT_X * GRID_COUNT_Y];
+    float4 c[GRID_COUNT_X * GRID_COUNT_Y];
 };
 
 struct PSInput
@@ -25,7 +28,7 @@ PSInput VSMain(float4 position : POSITION, float4 color : COLOR, uint4 rindex : 
 {
     PSInput result;
 
-    result.position = mul(gWorldViewProj, position);
+    result.position = mul(position, gWorldViewProj[rindex[0]]);
     result.position.z = 0;
     result.color = color + c[rindex[0]];
 

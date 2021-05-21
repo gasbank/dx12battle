@@ -145,6 +145,7 @@
   <ItemGroup>
     <ClCompile Include="ErrorUtil.c" />
     <ClCompile Include="Main.c" />
+    <ClCompile Include="Matrix.c" />
     <ClCompile Include="Rectangle.c" />
     <ClCompile Include="RenderPass.c" />
     <ClCompile Include="Vertex.c" />
@@ -159,6 +160,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ErrorUtil.h" />
+    <ClInclude Include="Matrix.h" />
     <ClInclude Include="PredefinedGuid.h" />
     <ClInclude Include="Rectangle.h" />
     <ClInclude Include="RenderPass.h" />

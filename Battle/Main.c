@@ -8,17 +8,23 @@
 #include <D3Dcompiler.h>
 #include <math.h>
 #include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "Vertex.h"
 #include "PredefinedGuid.h"
 #include "ErrorUtil.h"
 #include "RenderPass.h"
 #include "Rectangle.h"
+#include "Matrix.h"
 
-#define WIN_WIDTH 800
-#define WIN_HEIGHT 600
-#define WIN_POS_X 200
-#define WIN_POS_Y 200
-#define FRAME_COUNT 2
+#define WIN_WIDTH (800*2)
+#define WIN_HEIGHT (600*2)
+#define WIN_POS_X (200)
+#define WIN_POS_Y (200)
+#define FRAME_COUNT (2)
+#define GRID_COUNT_X (8*4)
+#define GRID_COUNT_Y (6*4)
 
 ID3D12Device* gDevice;
 ID3D12CommandQueue* gCommandQueue;
@@ -51,10 +57,13 @@ __int64 gCountsPerSec;
 
 typedef struct _CBPEROBJECT
 {
-	float gWorldViewProj[16]; // 64-byte
-	float c[48][4]; // 768-byte
-	float pad0[4 * 4 * 3]; // 192-byte
+	float gWorldViewProj[GRID_COUNT_X * GRID_COUNT_Y][16]; // 64-byte
+	float c[GRID_COUNT_X * GRID_COUNT_Y][4]; // 768-byte
+	float pad0[4 * 4 * 3 + 16]; // 192-byte
 } CBPEROBJECT;
+
+const size_t x = sizeof(CBPEROBJECT);
+const size_t xx = sizeof(CBPEROBJECT) % 256;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -195,24 +204,55 @@ void UpdateScale(float scale, double sec, float rotY)
 	UINT8* dataBegin;
 	gUploadCBuffer->lpVtbl->Map(gUploadCBuffer, 0, NULL, (void**)&dataBegin);
 	CBPEROBJECT cbPerObject;
+	
 
-	float cy = cosf(rotY);
-	float sy = sinf(rotY);
+	float dx = 2.0f / GRID_COUNT_X;
+	float dy = 2.0f / GRID_COUNT_Y;
 
-	float mvpMat[] = {
-		 cy * scale,        0.0f, sy * scale, 0.0f,
-		       0.0f,       scale,       0.0f, 0.0f,
-		-sy * scale,        0.0f, cy * scale, 0.0f,
-		       0.0f,        0.0f,       0.0f, 1.0f,
-	};
-	memcpy(cbPerObject.gWorldViewProj, mvpMat, sizeof(mvpMat));
+	int gWorldViewProjIndex = 0;
 
+	for (int i = 0; i < GRID_COUNT_Y; i++)
+	{
+		for (int j = 0; j < GRID_COUNT_X; j++)
+		{
+			float cy = cosf(rotY + i + j);
+			float sy = sinf(rotY + i + j);
+
+			/*float scaleMat[] = {
+			  scale,        0.0f,  0.0f, 0.0f,
+			   0.0f,       scale,  0.0f, 0.0f,
+			   0.0f,        0.0f, scale, 0.0f,
+			   0.0f,        0.0f,  0.0f, 1.0f,
+			};*/
+			float rotYMat[] = {
+				   cy,        0.0f,   sy, 0.0f,
+				 0.0f,        1.0f, 0.0f, 0.0f,
+				  -sy,        0.0f,   cy, 0.0f,
+				 0.0f,        0.0f, 0.0f, 1.0f,
+			};
+
+			float t1Mat[16];
+			MatTranslate(t1Mat, -1.0f + dx / 2 + dx * j, 1.0f - dy / 2 - dy * i, 0);
+			float t2Mat[16];
+			MatTranslate(t2Mat, -(-1.0f + dx / 2 + dx * j), -(1.0f - dy / 2 - dy * i), 0);
+			
+			float m1[16];
+			float m2[16];
+
+			MatMult(m1, t1Mat, rotYMat);
+			MatMult(m2, m1, t2Mat);
+
+			memcpy(cbPerObject.gWorldViewProj[gWorldViewProjIndex], m2, sizeof(m2));
+			gWorldViewProjIndex++;
+		}
+	}
+	
 	memset(cbPerObject.c, 0, sizeof(cbPerObject.c));
 
 	for (int i = 0; i < _countof(cbPerObject.c); i++)
 	{
 		float s = sinf(((float)sec + i) * 3);
-		float d = 10.0f;
+		float d = 50.0f;
 		for (int j = 0; j < 4; j++)
 		{
 			cbPerObject.c[i][j] = s / 255.0f * d;
@@ -327,7 +367,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		const int uploadBufferSize = sizeof(CBPEROBJECT);
 		gUploadCBuffer = CreateCommittedResource(uploadBufferSize);
 
-		//UpdateScale(0.1f, 1, 1, 1, 1);
+		UpdateScale(1, 0, 0);
 
 		D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
 		((void(__stdcall*)(ID3D12DescriptorHeap*, D3D12_CPU_DESCRIPTOR_HANDLE*))
@@ -464,7 +504,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	//
 
 	UINT vertSize;
-	Vertex* triangleVerts = AllocRectangularGridDoubleSided(8, 6, &vertSize);
+	Vertex* triangleVerts = AllocRectangularGridDoubleSided(GRID_COUNT_X, GRID_COUNT_Y, &vertSize);
 
 	gBufVerts = CreateCommittedResource(vertSize);
 
@@ -491,6 +531,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 	static BOOL bRunning = TRUE;
 	static MSG msg;
+
+	double dsecAccum = 0;
+	int dsecCount = 0;
+
+	QueryPerformanceCounter((LARGE_INTEGER*)&gCurTime);
+
 	while (bRunning)
 	{
 		PeekMessage(&msg, hWnd, 0, 0, PM_REMOVE);
@@ -499,7 +545,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			bRunning = FALSE;
 		}
 
-
 		Render(gCommandAllocator, gCommandList, gPipelineState, gRootSignature, gCbvHeap, gRenderTargets[gFrameIndex],
 		       &gViewport, &gRectScissor, gRtvHeap, gFrameIndex, gRtvDescriptorSize, &gDescViewBufVert, vertSize);
 
@@ -507,11 +552,28 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		gCommandQueue->lpVtbl->ExecuteCommandLists(gCommandQueue, _countof(ppCommandLists), ppCommandLists);
 
 
-		ThrowIfFailed(gSwapChain->lpVtbl->Present(gSwapChain, 1, 0));
+		ThrowIfFailed(gSwapChain->lpVtbl->Present(gSwapChain, 0, 0));
 
 		WaitForPreviousFrame();
 
-		QueryPerformanceCounter((LARGE_INTEGER*)&gCurTime);
+		__int64 curTime;
+		QueryPerformanceCounter((LARGE_INTEGER*)&curTime);
+
+		double dsec = secondsPerCount * (curTime - gCurTime);
+
+		dsecAccum += dsec;
+		dsecCount++;
+		if (dsecAccum > 1.0f)
+		{
+			char m[80];
+			//wsprintf(m, L"Hello: %.2f", dsecAccum / dsecCount);
+			sprintf_s(m, 80, "Hello: %f %d WTF\n", dsecAccum / dsecCount, 1985);
+			OutputDebugStringA(m);
+			dsecAccum = 0;
+			dsecCount = 0;
+		}
+
+		gCurTime = curTime;
 
 		double sec = secondsPerCount * gCurTime;
 
@@ -519,7 +581,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		float d = 30.0f;
 
 		//UpdateScale(sinf((float)sec), 1, 1, 1, 1);
-		UpdateScale(sinf((float)sec), sec, (float)sec);
+		UpdateScale(1.0f, sec, (float)sec);
 	}
 
 	WaitForPreviousFrame();
