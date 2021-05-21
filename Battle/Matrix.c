@@ -69,3 +69,14 @@ void MatRotZ(float a[16], float t)
 	};
 	memcpy(a, m, sizeof(m));
 }
+
+void MatScale(float a[16], float s)
+{
+	float m[] = {
+		    s,     0.0f, 0.0f, 0.0f,
+		 0.0f,        s, 0.0f, 0.0f,
+		 0.0f,     0.0f,    s, 0.0f,
+		 0.0f,     0.0f, 0.0f, 1.0f,
+	};
+	memcpy(a, m, sizeof(m));
+}

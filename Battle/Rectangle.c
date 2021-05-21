@@ -140,7 +140,7 @@ Vertex* AllocRectangularGridDoubleSided(int xCount, int yCount, unsigned int* s)
 			SetVertexData(pV, xc + dx / 2, yc - dy / 2, 0, r2, g2, b2, 1, rIndex);
 			pV++;
 
-			SetVertexData(pV, xc, yc, 0, r3, b3, g3, 1, rIndex);
+			SetVertexData(pV, xc, yc, 0, r3, g3, b3, 1, rIndex);
 			pV++;
 			SetVertexData(pV, xc + dx / 2, yc - dy / 2, 0, r2, g2, b2, 1, rIndex);
 			pV++;
@@ -156,7 +156,7 @@ Vertex* AllocRectangularGridDoubleSided(int xCount, int yCount, unsigned int* s)
 			SetVertexData(pV, xc - dx / 2, yc + dy / 2, 0, r4, g4, b4, 1, rIndex);
 			pV++;
 
-			SetVertexData(pV, xc, yc, 0, r3, b3, g3, 1, rIndex);
+			SetVertexData(pV, xc, yc, 0, r3, g3, b3, 1, rIndex);
 			pV++;
 			SetVertexData(pV, xc - dx / 2, yc + dy / 2, 0, r4, g4, b4, 1, rIndex);
 			pV++;
@@ -172,7 +172,7 @@ Vertex* AllocRectangularGridDoubleSided(int xCount, int yCount, unsigned int* s)
 			SetVertexData(pV, xc - dx / 2, yc - dy / 2, 0, r3, g3, b3, 1, rIndex);
 			pV++;
 
-			SetVertexData(pV, xc, yc, 0, r3, b3, g3, 1, rIndex);
+			SetVertexData(pV, xc, yc, 0, r3, g3, b3, 1, rIndex);
 			pV++;
 			SetVertexData(pV, xc - dx / 2, yc - dy / 2, 0, r3, g3, b3, 1, rIndex);
 			pV++; 
@@ -188,7 +188,7 @@ Vertex* AllocRectangularGridDoubleSided(int xCount, int yCount, unsigned int* s)
 			SetVertexData(pV, xc + dx / 2, yc + dy / 2, 0, r1, g1, b1, 1, rIndex);
 			pV++;
 
-			SetVertexData(pV, xc, yc, 0, r3, b3, g3, 1, rIndex);
+			SetVertexData(pV, xc, yc, 0, r3, g3, b3, 1, rIndex);
 			pV++;
 			SetVertexData(pV, xc + dx / 2, yc + dy / 2, 0, r1, g1, b1, 1, rIndex);
 			pV++; 

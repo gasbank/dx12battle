@@ -215,6 +215,8 @@ void UpdateScale(float scale, double sec, float rot)
 	{
 		for (int j = 0; j < GRID_COUNT_X; j++)
 		{
+			float st = max(0.8f, fabsf(sinf((float)sec + 1.1f * i + 2.2f * j)));
+
 			float rotMat[16];
 			if (gWorldViewProjIndex % 2 == 0)
 			{
@@ -230,30 +232,30 @@ void UpdateScale(float scale, double sec, float rot)
 			MatTranslate(t1Mat, -1.0f + dx / 2 + dx * j, 1.0f - dy / 2 - dy * i, 0);
 			float t2Mat[16];
 			MatTranslate(t2Mat, -(-1.0f + dx / 2 + dx * j), -(1.0f - dy / 2 - dy * i), 0);
+
+			float s[16];
+			MatScale(s, st);
 			
 			float m1[16];
 			float m2[16];
+			float m3[16];
 
 			MatMult(m1, t1Mat, rotMat);
-			MatMult(m2, m1, t2Mat);
+			MatMult(m2, m1, s);
+			MatMult(m3, m2, t2Mat);
 
-			memcpy(cbPerObject.gWorldViewProj[gWorldViewProjIndex], m2, sizeof(m2));
+			float ss = sinf(((float)sec + i * cosf(sec/10.0f) - j * sinf(sec/20.0f)) * 3);
+			float d = 150.0f;
+			for (int j = 0; j < 4; j++)
+			{
+				cbPerObject.c[gWorldViewProjIndex][j] = ss / 255.0f * d;
+			}
+
+			memcpy(cbPerObject.gWorldViewProj[gWorldViewProjIndex], m3, sizeof(m3));
 			gWorldViewProjIndex++;
 		}
 	}
 	
-	memset(cbPerObject.c, 0, sizeof(cbPerObject.c));
-
-	for (int i = 0; i < _countof(cbPerObject.c); i++)
-	{
-		float s = sinf(((float)sec + i) * 3);
-		float d = 50.0f;
-		for (int j = 0; j < 4; j++)
-		{
-			cbPerObject.c[i][j] = s / 255.0f * d;
-		}
-	}
-
 	memcpy(dataBegin, &cbPerObject, sizeof(cbPerObject));
 	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
 }
