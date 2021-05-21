@@ -199,7 +199,7 @@ void InitConstantBuffer()
 	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
 }
 
-void UpdateScale(float scale, double sec, float rotY)
+void UpdateScale(float scale, double sec, float rot)
 {
 	UINT8* dataBegin;
 	gUploadCBuffer->lpVtbl->Map(gUploadCBuffer, 0, NULL, (void**)&dataBegin);
@@ -215,21 +215,16 @@ void UpdateScale(float scale, double sec, float rotY)
 	{
 		for (int j = 0; j < GRID_COUNT_X; j++)
 		{
-			float cy = cosf(rotY + i + j);
-			float sy = sinf(rotY + i + j);
+			float rotMat[16];
+			if (gWorldViewProjIndex % 2 == 0)
+			{
+				MatRotY(rotMat, rot + i + j);
+			}
+			else
+			{
+				MatRotX(rotMat, rot + i + j);
+			}
 
-			/*float scaleMat[] = {
-			  scale,        0.0f,  0.0f, 0.0f,
-			   0.0f,       scale,  0.0f, 0.0f,
-			   0.0f,        0.0f, scale, 0.0f,
-			   0.0f,        0.0f,  0.0f, 1.0f,
-			};*/
-			float rotYMat[] = {
-				   cy,        0.0f,   sy, 0.0f,
-				 0.0f,        1.0f, 0.0f, 0.0f,
-				  -sy,        0.0f,   cy, 0.0f,
-				 0.0f,        0.0f, 0.0f, 1.0f,
-			};
 
 			float t1Mat[16];
 			MatTranslate(t1Mat, -1.0f + dx / 2 + dx * j, 1.0f - dy / 2 - dy * i, 0);
@@ -239,7 +234,7 @@ void UpdateScale(float scale, double sec, float rotY)
 			float m1[16];
 			float m2[16];
 
-			MatMult(m1, t1Mat, rotYMat);
+			MatMult(m1, t1Mat, rotMat);
 			MatMult(m2, m1, t2Mat);
 
 			memcpy(cbPerObject.gWorldViewProj[gWorldViewProjIndex], m2, sizeof(m2));
