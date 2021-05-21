@@ -12,6 +12,7 @@
 #include "PredefinedGuid.h"
 #include "ErrorUtil.h"
 #include "RenderPass.h"
+#include "Rectangle.h"
 
 #define WIN_WIDTH 800
 #define WIN_HEIGHT 600
@@ -217,102 +218,6 @@ void UpdateScale(float scale, double sec)
 	memcpy(dataBegin, &cbPerObject, sizeof(cbPerObject));
 	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
 }
-
-void SetVertexData(Vertex* pV, float x, float y, float z, float cr, float cg, float cb, float ca, UINT rindex)
-{
-	pV->position[0] = x;
-	pV->position[1] = y;
-	pV->position[2] = z;
-	pV->color[0] = cr;
-	pV->color[1] = cg;
-	pV->color[2] = cb;
-	pV->color[3] = ca;
-	pV->rindex[0] = pV->rindex[1] = pV->rindex[2] = pV->rindex[3] = rindex;
-}
-
-Vertex* AllocRectangularGrid(int xCount, int yCount, UINT* s)
-{
-	if (xCount < 1 || yCount < 1)
-	{
-		*s = 0;
-		return NULL;
-	}
-
-	int vertexCount = xCount * yCount * 4 * 3;
-	Vertex* v = malloc(sizeof(Vertex) * vertexCount);
-	float dx = 2.0f / xCount;
-	float dy = 2.0f / yCount;
-	Vertex* pV = v;
-	UINT rIndex = 0;
-	for (int x = 0; x < xCount; x++)
-	{
-		for (int y = 0; y < yCount; y++)
-		{
-			float xc = (-1.0f + dx / 2 + dx * x);
-			float yc = (+1.0f - dy / 2 - dy * y);
-
-			int dev = 50;
-
-			float r0 = (33 + (rand() % dev - dev / 2)) / 255.0f;
-			float g0 = (27 + (rand() % dev - dev / 2)) / 255.0f;
-			float b0 = (102 + (rand() % dev - dev / 2)) / 255.0f;
-
-			float r1 = (78 + (rand() % dev - dev / 2)) / 255.0f;
-			float g1 = (63 + (rand() % dev - dev / 2)) / 255.0f;
-			float b1 = (242 + (rand() % dev - dev / 2)) / 255.0f;
-
-			float r2 = (53 + (rand() % dev - dev / 2)) / 255.0f;
-			float g2 = (43 + (rand() % dev - dev / 2)) / 255.0f;
-			float b2 = (166 + (rand() % dev - dev / 2)) / 255.0f;
-
-			float r3 = (66 + (rand() % dev - dev / 2)) / 255.0f;
-			float g3 = (53 + (rand() % dev - dev / 2)) / 255.0f;
-			float b3 = (204 + (rand() % dev - dev / 2)) / 255.0f;
-
-			float r4 = (75 + (rand() % dev - dev / 2)) / 255.0f;
-			float g4 = (60 + (rand() % dev - dev / 2)) / 255.0f;
-			float b4 = (230 + (rand() % dev - dev / 2)) / 255.0f;
-
-
-			// 동
-			SetVertexData(pV, xc, yc, 0, r3, g3, b3, 1, rIndex);
-			pV++;
-			SetVertexData(pV, xc + dx / 2, yc + dy / 2, 0, r1, g1, b1, 1, rIndex);
-			pV++;
-			SetVertexData(pV, xc + dx / 2, yc - dy / 2, 0, r2, g2, b2, 1, rIndex);
-			pV++;
-
-			// 서
-			SetVertexData(pV, xc, yc, 0, r3, g3, b3, 1, rIndex);
-			pV++;
-			SetVertexData(pV, xc - dx / 2, yc - dy / 2, 0, r3, g3, b3, 1, rIndex);
-			pV++;
-			SetVertexData(pV, xc - dx / 2, yc + dy / 2, 0, r4, g4, b4, 1, rIndex);
-			pV++;
-
-			// 남
-			SetVertexData(pV, xc, yc, 0, r3, g3, b3, 1, rIndex);
-			pV++;
-			SetVertexData(pV, xc + dx / 2, yc - dy / 2, 0, r2, g2, b2, 1, rIndex);
-			pV++;
-			SetVertexData(pV, xc - dx / 2, yc - dy / 2, 0, r3, g3, b3, 1, rIndex);
-			pV++;
-
-			// 북
-			SetVertexData(pV, xc, yc, 0, r3, g3, b3, 1, rIndex);
-			pV++;
-			SetVertexData(pV, xc - dx / 2, yc + dy / 2, 0, r4, g4, b4, 1, rIndex);
-			pV++;
-			SetVertexData(pV, xc + dx / 2, yc + dy / 2, 0, r1, g1, b1, 1, rIndex);
-			pV++;
-
-			rIndex = (rIndex + 1) % 48;
-		}
-	}
-	*s = sizeof(Vertex) * xCount * yCount * 4 * 3;
-	return v;
-}
-
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine,
                       _In_ int nCmdShow)
@@ -555,7 +460,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	//
 
 	UINT vertSize;
-	Vertex* triangleVerts = AllocRectangularGrid(32, 24, &vertSize);
+	Vertex* triangleVerts = AllocRectangularGrid(8, 6, &vertSize);
 
 	gBufVerts = CreateCommittedResource(vertSize);
 

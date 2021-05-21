@@ -27,6 +27,9 @@
     <ClCompile Include="ErrorUtil.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Rectangle.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shaders.hlsl">
@@ -44,6 +47,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ErrorUtil.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Rectangle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

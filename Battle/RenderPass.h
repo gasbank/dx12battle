@@ -1,4 +1,5 @@
 #ifndef __RENDER_PASS_H_
+#define __RENDER_PASS_H_
 
 #include <d3d12.h>
 
