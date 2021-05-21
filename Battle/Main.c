@@ -10,22 +10,14 @@
 #include <time.h>
 #include "Vertex.h"
 #include "PredefinedGuid.h"
+#include "ErrorUtil.h"
+#include "RenderPass.h"
 
 #define WIN_WIDTH 800
 #define WIN_HEIGHT 600
 #define WIN_POS_X 200
 #define WIN_POS_Y 200
 #define FRAME_COUNT 2
-
-inline void ThrowIfFailed(HRESULT hr)
-{
-#if defined(_DEBUG)
-	if (hr != S_OK)
-	{
-		MessageBoxA(NULL, "Function call failed", "Error", MB_OK | MB_ICONERROR);
-	}
-#endif
-}
 
 ID3D12Device* gDevice;
 ID3D12CommandQueue* gCommandQueue;
@@ -35,9 +27,12 @@ ID3D12DescriptorHeap* gRtvHeap;
 UINT gRtvDescriptorSize;
 ID3D12Resource* gRenderTargets[FRAME_COUNT];
 ID3D12CommandAllocator* gCommandAllocator;
+ID3D12CommandAllocator* gCommandAllocator2;
 ID3D12GraphicsCommandList* gCommandList;
+ID3D12GraphicsCommandList* gCommandList2;
 ID3D12RootSignature* gRootSignature;
 ID3D12PipelineState* gPipelineState;
+ID3D12PipelineState* gPipelineState2;
 ID3D12Resource* gBufVerts;
 D3D12_VERTEX_BUFFER_VIEW gDescViewBufVert;
 ID3D12Fence* gFence;
@@ -46,6 +41,10 @@ HANDLE gFenceEvent;
 ID3D12DescriptorHeap* gCbvHeap;
 UINT gCbvDescriptorSize;
 ID3D12Resource* gUploadCBuffer;
+
+D3D12_VIEWPORT gViewport = {0.0f, 0.0f, (float)(WIN_WIDTH), (float)(WIN_HEIGHT), 0.0f, 1.0f};
+D3D12_RECT gRectScissor = {0, 0, (LONG)(WIN_WIDTH), (LONG)(WIN_HEIGHT)};
+
 __int64 gCurTime;
 __int64 gCountsPerSec;
 
@@ -111,6 +110,8 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
 void ReleaseCom(void* comPtr)
 {
+	if (comPtr == NULL) return;
+
 	IUnknown* p = (IUnknown*)comPtr;
 	p->lpVtbl->Release(p);
 }
@@ -183,7 +184,7 @@ void InitConstantBuffer()
 	};
 	memcpy(cbPerObject.gWorldViewProj, mvpMat, sizeof(mvpMat));
 	memset(cbPerObject.c, 0, sizeof(cbPerObject.c));
-	
+
 	memcpy(dataBegin, &cbPerObject, sizeof(cbPerObject));
 	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
 }
@@ -205,22 +206,27 @@ void UpdateScale(float scale, double sec)
 
 	for (int i = 0; i < _countof(cbPerObject.c); i++)
 	{
-		float s = sinf(((float)sec + i) * 2);
+		float s = sinf(((float)sec + i) * 1);
 		float d = 10.0f;
 		for (int j = 0; j < 4; j++)
-		{	
+		{
 			cbPerObject.c[i][j] = s / 255.0f * d;
 		}
 	}
-	
+
 	memcpy(dataBegin, &cbPerObject, sizeof(cbPerObject));
 	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
 }
 
 void SetVertexData(Vertex* pV, float x, float y, float z, float cr, float cg, float cb, float ca, UINT rindex)
 {
-	pV->position[0] = x; pV->position[1] = y; pV->position[2] = z;
-	pV->color[0] = cr; pV->color[1] = cg; pV->color[2] = cb; pV->color[3] = ca;
+	pV->position[0] = x;
+	pV->position[1] = y;
+	pV->position[2] = z;
+	pV->color[0] = cr;
+	pV->color[1] = cg;
+	pV->color[2] = cb;
+	pV->color[3] = ca;
 	pV->rindex[0] = pV->rindex[1] = pV->rindex[2] = pV->rindex[3] = rindex;
 }
 
@@ -231,7 +237,7 @@ Vertex* AllocRectangularGrid(int xCount, int yCount, UINT* s)
 		*s = 0;
 		return NULL;
 	}
-	
+
 	int vertexCount = xCount * yCount * 4 * 3;
 	Vertex* v = malloc(sizeof(Vertex) * vertexCount);
 	float dx = 2.0f / xCount;
@@ -307,6 +313,7 @@ Vertex* AllocRectangularGrid(int xCount, int yCount, UINT* s)
 	return v;
 }
 
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine,
                       _In_ int nCmdShow)
 {
@@ -314,8 +321,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
 	MyRegisterClass(hInstance);
-	const HWND hWnd = CreateWindow(L"Battle", L"Battle", WS_POPUP | WS_VISIBLE, WIN_POS_X, WIN_POS_Y, WIN_WIDTH, WIN_HEIGHT, 0, 0, hInstance, 0);
-	
+	const HWND hWnd = CreateWindow(L"Battle", L"Battle", WS_POPUP | WS_VISIBLE, WIN_POS_X, WIN_POS_Y, WIN_WIDTH,
+	                               WIN_HEIGHT, 0, 0, hInstance, 0);
+
 	UINT dxgiFactoryFlags = 0;
 
 #if defined(_DEBUG)
@@ -425,7 +433,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 	gDevice->lpVtbl->CreateCommandAllocator(gDevice, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator,
 	                                        (LPVOID*)&gCommandAllocator);
-
+	gDevice->lpVtbl->CreateCommandAllocator(gDevice, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator,
+	                                        (LPVOID*)&gCommandAllocator2);
 
 	{
 		ID3DBlob* pOutBlob;
@@ -444,7 +453,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		slotRootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 		slotRootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 		slotRootParameter[0].DescriptorTable = rootDescriptorTable;
-		
+
 		D3D12_ROOT_SIGNATURE_DESC descRootSignature =
 		{
 			1,
@@ -532,9 +541,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	                                                 (LPVOID*)&gCommandList));
 
 
-	D3D12_VIEWPORT mViewport = {0.0f, 0.0f, (float)(WIN_WIDTH), (float)(WIN_HEIGHT), 0.0f, 1.0f};
-	D3D12_RECT mRectScissor = {0, 0, (LONG)(WIN_WIDTH), (LONG)(WIN_HEIGHT)};
-
 	// Define the geometry for a triangle.
 	// Vertex triangleVerts[] =
 	// {
@@ -563,6 +569,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	gDescViewBufVert.SizeInBytes = vertSize;
 
 	ThrowIfFailed(gCommandList->lpVtbl->Close(gCommandList));
+	//ThrowIfFailed(gCommandList2->lpVtbl->Close(gCommandList2));
 
 	ThrowIfFailed(gDevice->lpVtbl->CreateFence(gDevice, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, (LPVOID*)&gFence));
 	gCurrentFence = 1;
@@ -583,74 +590,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			bRunning = FALSE;
 		}
 
-		ThrowIfFailed(gCommandAllocator->lpVtbl->Reset(gCommandAllocator));
-		ThrowIfFailed(gCommandList->lpVtbl->Reset(gCommandList, gCommandAllocator, gPipelineState));
 
-		gCommandList->lpVtbl->SetGraphicsRootSignature(gCommandList, gRootSignature);
-		ID3D12DescriptorHeap* descriptorHeaps[] = { gCbvHeap };
-		gCommandList->lpVtbl->SetDescriptorHeaps(gCommandList, 1, descriptorHeaps);
-
-		D3D12_GPU_DESCRIPTOR_HANDLE cbvHandle;
-		((void(__stdcall*)(ID3D12DescriptorHeap*, D3D12_GPU_DESCRIPTOR_HANDLE*))
-			gCbvHeap->lpVtbl->GetGPUDescriptorHandleForHeapStart)(gCbvHeap, &cbvHandle);
-
-		gCommandList->lpVtbl->SetGraphicsRootDescriptorTable(gCommandList, 0, cbvHandle);
-		
-		gCommandList->lpVtbl->RSSetViewports(gCommandList, 1, &mViewport);
-		gCommandList->lpVtbl->RSSetScissorRects(gCommandList, 1, &mRectScissor);
-
-
-		D3D12_RESOURCE_BARRIER barrierRTAsTexture =
-		{
-			D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-			D3D12_RESOURCE_BARRIER_FLAG_NONE,
-			{
-				{
-					gRenderTargets[gFrameIndex],
-					D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-					D3D12_RESOURCE_STATE_PRESENT,
-					D3D12_RESOURCE_STATE_RENDER_TARGET
-				}
-			}
-		};
-
-		gCommandList->lpVtbl->ResourceBarrier(gCommandList, 1, &barrierRTAsTexture);
-
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle;
-		((void(__stdcall*)(ID3D12DescriptorHeap*, D3D12_CPU_DESCRIPTOR_HANDLE*))
-			gRtvHeap->lpVtbl->GetCPUDescriptorHandleForHeapStart)(gRtvHeap, &rtvHandle);
-
-		rtvHandle.ptr += (SIZE_T)gRtvDescriptorSize * gFrameIndex;
-
-		// Record commands.
-		float clearColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
-		gCommandList->lpVtbl->ClearRenderTargetView(gCommandList, rtvHandle, clearColor, 0, NULL);
-
-		gCommandList->lpVtbl->OMSetRenderTargets(gCommandList, 1, &rtvHandle, TRUE, NULL);
-		gCommandList->lpVtbl->IASetPrimitiveTopology(gCommandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		gCommandList->lpVtbl->IASetVertexBuffers(gCommandList, 0, 1, &gDescViewBufVert);
-		gCommandList->lpVtbl->DrawInstanced(gCommandList, vertSize / sizeof(Vertex), 1, 0, 0);
-
-		D3D12_RESOURCE_BARRIER barrierRTForPresent =
-		{
-			D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-			D3D12_RESOURCE_BARRIER_FLAG_NONE,
-			{
-				{
-					gRenderTargets[gFrameIndex],
-					D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-					D3D12_RESOURCE_STATE_RENDER_TARGET,
-					D3D12_RESOURCE_STATE_PRESENT
-				}
-			}
-		};
-
-		gCommandList->lpVtbl->ResourceBarrier(gCommandList, 1, &barrierRTForPresent);
-
-		ThrowIfFailed(gCommandList->lpVtbl->Close(gCommandList));
+		Render(gCommandAllocator, gCommandList, gPipelineState, gRootSignature, gCbvHeap, gRenderTargets[gFrameIndex],
+		       &gViewport, &gRectScissor, gRtvHeap, gFrameIndex, gRtvDescriptorSize, &gDescViewBufVert, vertSize);
 
 		ID3D12CommandList* ppCommandLists[] = {(ID3D12CommandList*)gCommandList};
 		gCommandQueue->lpVtbl->ExecuteCommandLists(gCommandQueue, _countof(ppCommandLists), ppCommandLists);
+
 
 		ThrowIfFailed(gSwapChain->lpVtbl->Present(gSwapChain, 1, 0));
 
@@ -662,7 +608,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 		float s = sinf((float)sec);
 		float d = 30.0f;
-		
+
 		//UpdateScale(sinf((float)sec), 1, 1, 1, 1);
 		UpdateScale(1, sec);
 	}
@@ -683,15 +629,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		ReleaseCom(gRenderTargets[n]);
 	}
 	ReleaseCom(gCommandAllocator);
+	ReleaseCom(gCommandAllocator2);
 	ReleaseCom(gCommandList);
+	ReleaseCom(gCommandList2);
 	ReleaseCom(gRootSignature);
 	ReleaseCom(gPipelineState);
+	ReleaseCom(gPipelineState2);
 	ReleaseCom(gBufVerts);
 	ReleaseCom(gFence);
 	ReleaseCom(gCbvHeap);
 	ReleaseCom(gUploadCBuffer);
 
 	free(triangleVerts);
-	
+
 	return (int)msg.wParam;
 }
