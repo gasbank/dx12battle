@@ -25,7 +25,8 @@ PSInput VSMain(float4 position : POSITION, float4 color : COLOR, uint4 rindex : 
 {
     PSInput result;
 
-    result.position = mul(position, gWorldViewProj);
+    result.position = mul(gWorldViewProj, position);
+    result.position.z = 0;
     result.color = color + c[rindex[0]];
 
     return result;

@@ -190,16 +190,20 @@ void InitConstantBuffer()
 	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
 }
 
-void UpdateScale(float scale, double sec)
+void UpdateScale(float scale, double sec, float rotY)
 {
 	UINT8* dataBegin;
 	gUploadCBuffer->lpVtbl->Map(gUploadCBuffer, 0, NULL, (void**)&dataBegin);
 	CBPEROBJECT cbPerObject;
+
+	float cy = cosf(rotY);
+	float sy = sinf(rotY);
+
 	float mvpMat[] = {
-		scale, 0.0f, 0.0f, 0.0f,
-		0.0f, scale, 0.0f, 0.0f,
-		0.0f, 0.0f, scale, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f,
+		 cy * scale,        0.0f, sy * scale, 0.0f,
+		       0.0f,       scale,       0.0f, 0.0f,
+		-sy * scale,        0.0f, cy * scale, 0.0f,
+		       0.0f,        0.0f,       0.0f, 1.0f,
 	};
 	memcpy(cbPerObject.gWorldViewProj, mvpMat, sizeof(mvpMat));
 
@@ -207,7 +211,7 @@ void UpdateScale(float scale, double sec)
 
 	for (int i = 0; i < _countof(cbPerObject.c); i++)
 	{
-		float s = sinf(((float)sec + i) * 1);
+		float s = sinf(((float)sec + i) * 3);
 		float d = 10.0f;
 		for (int j = 0; j < 4; j++)
 		{
@@ -460,7 +464,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	//
 
 	UINT vertSize;
-	Vertex* triangleVerts = AllocRectangularGrid(8, 6, &vertSize);
+	Vertex* triangleVerts = AllocRectangularGridDoubleSided(8, 6, &vertSize);
 
 	gBufVerts = CreateCommittedResource(vertSize);
 
@@ -515,7 +519,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		float d = 30.0f;
 
 		//UpdateScale(sinf((float)sec), 1, 1, 1, 1);
-		UpdateScale(1, sec);
+		UpdateScale(sinf((float)sec), sec, (float)sec);
 	}
 
 	WaitForPreviousFrame();
