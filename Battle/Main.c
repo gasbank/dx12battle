@@ -50,7 +50,7 @@ DEFINE_GUIDW(IID_IDXGIAdapter3, 0x645967A4, 0x1392, 0x4310, 0xA7, 0x98, 0x80, 0x
 
 #pragma endregion
 
-#define WIN_WIDTH 800
+#define WIN_WIDTH 800``
 #define WIN_HEIGHT 600
 #define WIN_POS_X 200
 #define WIN_POS_Y 200
@@ -163,7 +163,7 @@ void WaitForPreviousFrame()
 	gFrameIndex = gSwapChain->lpVtbl->GetCurrentBackBufferIndex(gSwapChain);
 }
 
-ID3D12Resource* CreateCommittedResource(int size)
+ID3D12Resource* CreateCommittedResource(size_t size)
 {
 	D3D12_HEAP_PROPERTIES heapProperties =
 	{
@@ -215,6 +215,75 @@ void UpdateScale(float scale, float c0, float c1, float c2, float c3)
 	};
 	memcpy(dataBegin, mvpMat, sizeof(mvpMat));
 	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
+}
+
+typedef struct
+{
+	float position[3];
+	float color[4];
+} Vertex;
+
+void SetVertexData(Vertex* pV, float x, float y, float z, float cr, float cg, float cb, float ca)
+{
+	pV->position[0] = x; pV->position[1] = y; pV->position[2] = z;
+	pV->color[0] = cr; pV->color[1] = cg; pV->color[2] = cb; pV->color[3] = ca;
+}
+
+Vertex* AllocRectangularGrid(int xCount, int yCount, UINT* s)
+{
+	if (xCount < 1 || yCount < 1)
+	{
+		*s = 0;
+		return NULL;
+	}
+	
+	int vertexCount = xCount * yCount * 4 * 3;
+	Vertex* v = malloc(sizeof(Vertex) * vertexCount);
+	float dx = 2.0f / xCount;
+	float dy = 2.0f / yCount;
+	Vertex* pV = v;
+	for (int x = 0; x < xCount; x++)
+	{
+		for (int y = 0; y < yCount; y++)
+		{
+			float xc = (-1.0f + dx / 2 + dx * x);
+			float yc = (+1.0f - dy / 2 - dy * y);
+
+			// 동
+			SetVertexData(pV, xc, yc, 0, 1, 0, 0, 1);
+			pV++;
+			SetVertexData(pV, xc + dx / 2, yc + dy / 2, 0, 1, 0, 0, 1);
+			pV++;
+			SetVertexData(pV, xc + dx / 2, yc - dy / 2, 0, 1, 0, 0, 1);
+			pV++;
+
+			// 서
+			SetVertexData(pV, xc, yc, 0, 0, 1, 0, 1);
+			pV++;
+			SetVertexData(pV, xc - dx / 2, yc - dy / 2, 0, 0, 1, 0, 1);
+			pV++;
+			SetVertexData(pV, xc - dx / 2, yc + dy / 2, 0, 0, 1, 0, 1);
+			pV++;
+
+			// 남
+			SetVertexData(pV, xc, yc, 0, 0, 0, 1, 1);
+			pV++;
+			SetVertexData(pV, xc + dx / 2, yc - dy / 2, 0, 0, 0, 1, 1);
+			pV++;
+			SetVertexData(pV, xc - dx / 2, yc - dy / 2, 0, 0, 0, 1, 1);
+			pV++;
+
+			// 북
+			SetVertexData(pV, xc, yc, 0, 1, 1, 1, 1);
+			pV++;
+			SetVertexData(pV, xc - dx / 2, yc + dy / 2, 0, 1, 1, 1, 1);
+			pV++;
+			SetVertexData(pV, xc + dx / 2, yc + dy / 2, 0, 1, 1, 1, 1);
+			pV++;
+		}
+	}
+	*s = sizeof(Vertex) * xCount * yCount * 4 * 3;
+	return v;
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine,
@@ -446,30 +515,32 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	D3D12_VIEWPORT mViewport = {0.0f, 0.0f, (float)(WIN_WIDTH), (float)(WIN_HEIGHT), 0.0f, 1.0f};
 	D3D12_RECT mRectScissor = {0, 0, (LONG)(WIN_WIDTH), (LONG)(WIN_HEIGHT)};
 
-	typedef struct
-	{
-		float position[3];
-		float color[4];
-	} Vertex;
-
 	// Define the geometry for a triangle.
-	Vertex triangleVerts[] =
-	{
-		{{0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-		{{1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
-		{{-1.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}
-	};
+	// Vertex triangleVerts[] =
+	// {
+	// 	{{0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+	// 	{{1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+	// 	{{-1.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}},
+	//
+	// 	{{1.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+	// 	{{1.0f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+	// 	{{0.5f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}},
+	// };
+	//
 
-	gBufVerts = CreateCommittedResource(_countof(triangleVerts) * sizeof(Vertex));
+	UINT vertSize;
+	Vertex* triangleVerts = AllocRectangularGrid(8, 6, &vertSize);
+
+	gBufVerts = CreateCommittedResource(vertSize);
 
 	UINT8* dataBegin;
 	gBufVerts->lpVtbl->Map(gBufVerts, 0, NULL, (void**)(&dataBegin));
-	memcpy(dataBegin, triangleVerts, sizeof(triangleVerts));
+	memcpy(dataBegin, triangleVerts, vertSize);
 	gBufVerts->lpVtbl->Unmap(gBufVerts, 0, NULL);
 
 	gDescViewBufVert.BufferLocation = gBufVerts->lpVtbl->GetGPUVirtualAddress(gBufVerts);
 	gDescViewBufVert.StrideInBytes = sizeof(Vertex);
-	gDescViewBufVert.SizeInBytes = sizeof(triangleVerts);
+	gDescViewBufVert.SizeInBytes = vertSize;
 
 	ThrowIfFailed(gCommandList->lpVtbl->Close(gCommandList));
 
@@ -538,7 +609,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		gCommandList->lpVtbl->OMSetRenderTargets(gCommandList, 1, &rtvHandle, TRUE, NULL);
 		gCommandList->lpVtbl->IASetPrimitiveTopology(gCommandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		gCommandList->lpVtbl->IASetVertexBuffers(gCommandList, 0, 1, &gDescViewBufVert);
-		gCommandList->lpVtbl->DrawInstanced(gCommandList, 3, 1, 0, 0);
+		gCommandList->lpVtbl->DrawInstanced(gCommandList, vertSize / sizeof(Vertex), 1, 0, 0);
 
 		D3D12_RESOURCE_BARRIER barrierRTForPresent =
 		{
@@ -569,7 +640,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 		double sec = secondsPerCount * gCurTime;
 		
-		UpdateScale(sinf((float)sec), 0, 1, 1, 1);
+		//UpdateScale(sinf((float)sec), 1, 1, 1, 1);
+		UpdateScale(1, 1, 1, 1, 1);
 	}
 
 	WaitForPreviousFrame();
@@ -595,5 +667,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	ReleaseCom(gFence);
 	ReleaseCom(gCbvHeap);
 	ReleaseCom(gUploadCBuffer);
+
+	free(triangleVerts);
+	
 	return (int)msg.wParam;
 }
