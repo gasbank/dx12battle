@@ -9,8 +9,8 @@
 //
 //*********************************************************
 
-#define GRID_COUNT_X (8*4)
-#define GRID_COUNT_Y (6*4)
+//#define GRID_COUNT_X (16*4)
+//#define GRID_COUNT_Y (9*4)
 
 cbuffer cbPerObject : register(b0)
 {

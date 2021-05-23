@@ -18,13 +18,16 @@
 #include "Rectangle.h"
 #include "Matrix.h"
 
-#define WIN_WIDTH (800*2)
-#define WIN_HEIGHT (600*2)
-#define WIN_POS_X (200)
-#define WIN_POS_Y (200)
+#define WIN_WIDTH (1920)
+#define WIN_HEIGHT (1080)
+#define WIN_POS_X (0)
+#define WIN_POS_Y (0)
 #define FRAME_COUNT (2)
-#define GRID_COUNT_X (8*4)
-#define GRID_COUNT_Y (6*4)
+#define GRID_COUNT_X (16*2)
+#define GRID_COUNT_Y (9*2)
+
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
 
 ID3D12Device* gDevice;
 ID3D12CommandQueue* gCommandQueue;
@@ -49,12 +52,13 @@ ID3D12DescriptorHeap* gCbvHeap;
 UINT gCbvDescriptorSize;
 ID3D12Resource* gUploadCBuffer;
 
-D3D12_VIEWPORT gViewport = {0.0f, 0.0f, (float)(WIN_WIDTH), (float)(WIN_HEIGHT), 0.0f, 1.0f};
-D3D12_RECT gRectScissor = {0, 0, (LONG)(WIN_WIDTH), (LONG)(WIN_HEIGHT)};
+D3D12_VIEWPORT gViewport = { 0.0f, 0.0f, (float)(WIN_WIDTH), (float)(WIN_HEIGHT), 0.0f, 1.0f };
+D3D12_RECT gRectScissor = { 0, 0, (LONG)(WIN_WIDTH), (LONG)(WIN_HEIGHT) };
 
 __int64 gCurTime;
 __int64 gCountsPerSec;
 
+// 상수 버퍼의 최대 크기는 64 KB (65,536바이트)다.
 typedef struct _CBPEROBJECT
 {
 	float gWorldViewProj[GRID_COUNT_X * GRID_COUNT_Y][16]; // 64-byte
@@ -62,32 +66,32 @@ typedef struct _CBPEROBJECT
 	float pad0[4 * 4 * 3 + 16]; // 192-byte
 } CBPEROBJECT;
 
-const size_t x = sizeof(CBPEROBJECT);
-const size_t xx = sizeof(CBPEROBJECT) % 256;
+const size_t CBPEROBJECT_SIZE = sizeof(CBPEROBJECT);
+const size_t CBPEROBJECT_SIZE_REMAINDER = sizeof(CBPEROBJECT) % 256;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
 	{
 	case WM_COMMAND:
+	{
+		int wmId = LOWORD(wParam);
+		// Parse the menu selections:
+		switch (wmId)
 		{
-			int wmId = LOWORD(wParam);
-			// Parse the menu selections:
-			switch (wmId)
-			{
-			default:
-				return DefWindowProc(hWnd, message, wParam, lParam);
-			}
+		default:
+			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
-		break;
+	}
+	break;
 	case WM_PAINT:
-		{
-			PAINTSTRUCT ps;
-			HDC hdc = BeginPaint(hWnd, &ps);
-			// TODO: Add any drawing code that uses hdc here...
-			EndPaint(hWnd, &ps);
-		}
-		break;
+	{
+		PAINTSTRUCT ps;
+		HDC hdc = BeginPaint(hWnd, &ps);
+		// TODO: Add any drawing code that uses hdc here...
+		EndPaint(hWnd, &ps);
+	}
+	break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
@@ -170,13 +174,13 @@ ID3D12Resource* CreateCommittedResource(size_t size)
 	ID3D12Resource* pRes;
 
 	ThrowIfFailed(gDevice->lpVtbl->CreateCommittedResource(gDevice,
-	                                                       &heapProperties,
-	                                                       D3D12_HEAP_FLAG_NONE,
-	                                                       &VertexBufferDesc,
-	                                                       D3D12_RESOURCE_STATE_GENERIC_READ,
-	                                                       NULL, // Clear value
-	                                                       &IID_ID3D12Resource,
-	                                                       (LPVOID*)&pRes));
+		&heapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&VertexBufferDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		NULL, // Clear value
+		&IID_ID3D12Resource,
+		(LPVOID*)&pRes));
 
 	return pRes;
 }
@@ -199,12 +203,12 @@ void InitConstantBuffer()
 	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
 }
 
-void UpdateScale(float scale, double sec, float rot)
+void UpdateScale(float scale, float sec, float rot)
 {
 	UINT8* dataBegin;
 	gUploadCBuffer->lpVtbl->Map(gUploadCBuffer, 0, NULL, (void**)&dataBegin);
 	CBPEROBJECT cbPerObject;
-	
+
 
 	float dx = 2.0f / GRID_COUNT_X;
 	float dy = 2.0f / GRID_COUNT_Y;
@@ -235,7 +239,7 @@ void UpdateScale(float scale, double sec, float rot)
 
 			float s[16];
 			MatScale(s, st);
-			
+
 			float m1[16];
 			float m2[16];
 			float m3[16];
@@ -244,7 +248,7 @@ void UpdateScale(float scale, double sec, float rot)
 			MatMult(m2, m1, s);
 			MatMult(m3, m2, t2Mat);
 
-			float ss = sinf(((float)sec + i * cosf(sec/10.0f) - j * sinf(sec/20.0f)) * 3);
+			float ss = sinf(((float)sec + i * cosf(sec / 10.0f) - j * sinf(sec / 20.0f)) * 3);
 			float d = 150.0f;
 			for (int j = 0; j < 4; j++)
 			{
@@ -255,20 +259,20 @@ void UpdateScale(float scale, double sec, float rot)
 			gWorldViewProjIndex++;
 		}
 	}
-	
+
 	memcpy(dataBegin, &cbPerObject, sizeof(cbPerObject));
 	gUploadCBuffer->lpVtbl->Unmap(gUploadCBuffer, 0, NULL);
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine,
-                      _In_ int nCmdShow)
+	_In_ int nCmdShow)
 {
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
 	MyRegisterClass(hInstance);
 	const HWND hWnd = CreateWindow(L"Battle", L"Battle", WS_POPUP | WS_VISIBLE, WIN_POS_X, WIN_POS_Y, WIN_WIDTH,
-	                               WIN_HEIGHT, 0, 0, hInstance, 0);
+		WIN_HEIGHT, 0, 0, hInstance, 0);
 
 	UINT dxgiFactoryFlags = 0;
 
@@ -309,12 +313,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 	IDXGISwapChain1* pSwapChain;
 	pFactory->lpVtbl->CreateSwapChainForHwnd(pFactory,
-	                                         (IUnknown*)gCommandQueue,
-	                                         hWnd,
-	                                         &descSwapChain,
-	                                         NULL,
-	                                         NULL,
-	                                         &pSwapChain);
+		(IUnknown*)gCommandQueue,
+		hWnd,
+		&descSwapChain,
+		NULL,
+		NULL,
+		&pSwapChain);
 
 	ThrowIfFailed(pFactory->lpVtbl->MakeWindowAssociation(pFactory, hWnd, DXGI_MWA_NO_ALT_ENTER));
 
@@ -323,15 +327,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	gFrameIndex = gSwapChain->lpVtbl->GetCurrentBackBufferIndex(gSwapChain);
 
 	{
-		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {0,};
+		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = { 0, };
 		rtvHeapDesc.NumDescriptors = FRAME_COUNT;
 		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		ThrowIfFailed(
-			gDevice->lpVtbl->CreateDescriptorHeap(gDevice, &rtvHeapDesc, &IID_ID3D12DescriptorHeap,
-			                                      (LPVOID*)&gRtvHeap));
+			gDevice->lpVtbl->CreateDescriptorHeap(gDevice,
+				&rtvHeapDesc, &IID_ID3D12DescriptorHeap,
+				(LPVOID*)&gRtvHeap));
 
-		gRtvDescriptorSize = gDevice->lpVtbl->GetDescriptorHandleIncrementSize(gDevice, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		gRtvDescriptorSize = gDevice->lpVtbl->GetDescriptorHandleIncrementSize(
+			gDevice, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
 	{
@@ -343,23 +349,27 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		for (UINT n = 0; n < FRAME_COUNT; n++)
 		{
 			ThrowIfFailed(
-				gSwapChain->lpVtbl->GetBuffer(gSwapChain, n, &IID_ID3D12Resource, (LPVOID*)&gRenderTargets[n]));
-			gDevice->lpVtbl->CreateRenderTargetView(gDevice, gRenderTargets[n], 0, rtvHandle);
+				gSwapChain->lpVtbl->GetBuffer(gSwapChain,
+					n, &IID_ID3D12Resource, (LPVOID*)&gRenderTargets[n]));
+
+			gDevice->lpVtbl->CreateRenderTargetView(gDevice,
+				gRenderTargets[n], 0, rtvHandle);
+
 			rtvHandle.ptr += gRtvDescriptorSize;
 		}
 	}
 
 	{
-		D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {0,};
+		D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = { 0, };
 		cbvHeapDesc.NumDescriptors = 1;
 		cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		ThrowIfFailed(
-			gDevice->lpVtbl->CreateDescriptorHeap(gDevice, &cbvHeapDesc, &IID_ID3D12DescriptorHeap,
-			                                      (LPVOID*)&gCbvHeap));
+			gDevice->lpVtbl->CreateDescriptorHeap(gDevice,
+				&cbvHeapDesc, &IID_ID3D12DescriptorHeap, (LPVOID*)&gCbvHeap));
 
 		gCbvDescriptorSize = gDevice->lpVtbl->GetDescriptorHandleIncrementSize(gDevice,
-		                                                                       D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 		const int uploadBufferSize = sizeof(CBPEROBJECT);
 		gUploadCBuffer = CreateCommittedResource(uploadBufferSize);
@@ -377,16 +387,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	}
 
 
-	gDevice->lpVtbl->CreateCommandAllocator(gDevice, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator,
-	                                        (LPVOID*)&gCommandAllocator);
-	gDevice->lpVtbl->CreateCommandAllocator(gDevice, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator,
-	                                        (LPVOID*)&gCommandAllocator2);
+	gDevice->lpVtbl->CreateCommandAllocator(gDevice,
+		D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator, (LPVOID*)&gCommandAllocator);
+	gDevice->lpVtbl->CreateCommandAllocator(gDevice,
+		D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator, (LPVOID*)&gCommandAllocator2);
 
 	{
 		ID3DBlob* pOutBlob;
 		ID3DBlob* pErrorBlob;
 
-		D3D12_DESCRIPTOR_RANGE cbvTableElement = {0,};
+		D3D12_DESCRIPTOR_RANGE cbvTableElement = { 0, };
 		cbvTableElement.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 		cbvTableElement.NumDescriptors = 1;
 		cbvTableElement.BaseShaderRegister = 0;
@@ -408,24 +418,33 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			NULL,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
 		};
-		ThrowIfFailed(D3D12SerializeRootSignature(&descRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &pOutBlob,
-		                                          &pErrorBlob));
-		ThrowIfFailed(gDevice->lpVtbl->CreateRootSignature(gDevice, 0, pOutBlob->lpVtbl->GetBufferPointer(pOutBlob),
-		                                                   pOutBlob->lpVtbl->GetBufferSize(pOutBlob),
-		                                                   &IID_ID3D12RootSignature,
-		                                                   (LPVOID*)&gRootSignature));
+		ThrowIfFailed(D3D12SerializeRootSignature(&descRootSignature,
+			D3D_ROOT_SIGNATURE_VERSION_1, &pOutBlob, &pErrorBlob));
+
+		ThrowIfFailed(gDevice->lpVtbl->CreateRootSignature(gDevice,
+			0, pOutBlob->lpVtbl->GetBufferPointer(pOutBlob),
+			pOutBlob->lpVtbl->GetBufferSize(pOutBlob),
+			&IID_ID3D12RootSignature, (LPVOID*)&gRootSignature));
 	}
 
 #if defined(_DEBUG)
 	// Enable better shader debugging with the graphics debugging tools.
 	UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #else
-    UINT compileFlags = 0;
+	UINT compileFlags = 0;
 #endif
+
+	// #define 매크로를 셰이더 파일에서 정의한 것처럼 해 준다. 편리!
+	D3D_SHADER_MACRO shaderMacros[] = {
+		{ "GRID_COUNT_X", STR(GRID_COUNT_X)},
+		{ "GRID_COUNT_Y", STR(GRID_COUNT_Y)},
+		{ 0, 0 },
+	};
+
 	ID3DBlob* vertexShader;
 	ID3DBlob* pixelShader;
-	ThrowIfFailed(D3DCompileFromFile(L"shaders.hlsl", 0, 0, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, 0));
-	ThrowIfFailed(D3DCompileFromFile(L"shaders.hlsl", 0, 0, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, 0));
+	ThrowIfFailed(D3DCompileFromFile(L"shaders.hlsl", shaderMacros, 0, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, 0));
+	ThrowIfFailed(D3DCompileFromFile(L"shaders.hlsl", shaderMacros, 0, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, 0));
 
 	D3D12_INPUT_ELEMENT_DESC layout[] =
 	{
@@ -461,7 +480,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		}
 	};
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {0,};
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = { 0, };
 	psoDesc.InputLayout.pInputElementDescs = layout;
 	psoDesc.InputLayout.NumElements = numElements;
 	psoDesc.pRootSignature = gRootSignature;
@@ -480,11 +499,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	psoDesc.SampleDesc.Count = 1;
 	ThrowIfFailed(
 		gDevice->lpVtbl->CreateGraphicsPipelineState(gDevice, &psoDesc, &IID_ID3D12PipelineState,
-		                                             (LPVOID*)&gPipelineState));
+			(LPVOID*)&gPipelineState));
 
 	ThrowIfFailed(gDevice->lpVtbl->CreateCommandList(gDevice, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, gCommandAllocator,
-	                                                 gPipelineState, &IID_ID3D12GraphicsCommandList,
-	                                                 (LPVOID*)&gCommandList));
+		gPipelineState, &IID_ID3D12GraphicsCommandList,
+		(LPVOID*)&gCommandList));
 
 
 	// Define the geometry for a triangle.
@@ -543,13 +562,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		}
 
 		Render(gCommandAllocator, gCommandList, gPipelineState, gRootSignature, gCbvHeap, gRenderTargets[gFrameIndex],
-		       &gViewport, &gRectScissor, gRtvHeap, gFrameIndex, gRtvDescriptorSize, &gDescViewBufVert, vertSize);
+			&gViewport, &gRectScissor, gRtvHeap, gFrameIndex, gRtvDescriptorSize, &gDescViewBufVert, vertSize);
 
-		ID3D12CommandList* ppCommandLists[] = {(ID3D12CommandList*)gCommandList};
+		ID3D12CommandList* ppCommandLists[] = { (ID3D12CommandList*)gCommandList };
 		gCommandQueue->lpVtbl->ExecuteCommandLists(gCommandQueue, _countof(ppCommandLists), ppCommandLists);
 
 
-		ThrowIfFailed(gSwapChain->lpVtbl->Present(gSwapChain, 0, 0));
+		ThrowIfFailed(gSwapChain->lpVtbl->Present(gSwapChain, 1, 0));
 
 		WaitForPreviousFrame();
 
@@ -564,6 +583,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{
 			char m[80];
 			//wsprintf(m, L"Hello: %.2f", dsecAccum / dsecCount);
+			//swprintf(
 			sprintf_s(m, 80, "Hello: %f %d WTF\n", dsecAccum / dsecCount, 1985);
 			OutputDebugStringA(m);
 			dsecAccum = 0;
@@ -578,7 +598,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		float d = 30.0f;
 
 		//UpdateScale(sinf((float)sec), 1, 1, 1, 1);
-		UpdateScale(1.0f, sec, (float)sec);
+		UpdateScale(1.0f, (float)sec, (float)sec);
 	}
 
 	WaitForPreviousFrame();
@@ -611,4 +631,4 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	free(triangleVerts);
 
 	return (int)msg.wParam;
-}
+	}

@@ -33,12 +33,12 @@ void MatTranslate(float a[16], float x, float y, float z)
 
 void MatRotX(float a[16], float t)
 {
-	float cy = cosf(t);
-	float sy = sinf(t);
+	float c = cosf(t);
+	float s = sinf(t);
 	float m[] = {
 		 1.0f,      0.0f, 0.0f, 0.0f,
-		 0.0f,        cy,  -sy, 0.0f,
-		 0.0f,        sy,   cy, 0.0f,
+		 0.0f,        c,  -s, 0.0f,
+		 0.0f,        s,   c, 0.0f,
 		 0.0f,      0.0f, 0.0f, 1.0f,
 	};
 	memcpy(a, m, sizeof(m));
@@ -46,12 +46,12 @@ void MatRotX(float a[16], float t)
 
 void MatRotY(float a[16], float t)
 {
-	float cy = cosf(t);
-	float sy = sinf(t);
+	float c = cosf(t);
+	float s = sinf(t);
 	float m[] = {
-		   cy,        0.0f,   sy, 0.0f,
+		   c,        0.0f,   s, 0.0f,
 		 0.0f,        1.0f, 0.0f, 0.0f,
-		  -sy,        0.0f,   cy, 0.0f,
+		  -s,        0.0f,   c, 0.0f,
 		 0.0f,        0.0f, 0.0f, 1.0f,
 	};
 	memcpy(a, m, sizeof(m));
@@ -59,11 +59,11 @@ void MatRotY(float a[16], float t)
 
 void MatRotZ(float a[16], float t)
 {
-	float cy = cosf(t);
-	float sy = sinf(t);
+	float c = cosf(t);
+	float s = sinf(t);
 	float m[] = {
-		   cy,       -sy, 0.0f, 0.0f,
-		   sy,        cy, 0.0f, 0.0f,
+		   c,       -s, 0.0f, 0.0f,
+		   s,        c, 0.0f, 0.0f,
 		 0.0f,      0.0f, 1.0f, 0.0f,
 		 0.0f,      0.0f, 0.0f, 1.0f,
 	};
